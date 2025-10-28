@@ -1,198 +1,562 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>HealthyHotMeal — Log meals, track heart-rate & improve</title>
-  <meta name="description" content="Personalized meal tracking, heart-rate sync, daily micro-habits. Start free."/>
-  <meta name="theme-color" content="#0ea5a4"/>
-  
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  
-  <style>
-    body {
-      font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    }
-    
-    /* Minimal custom CSS */
-    html, body { height: 100%; }
-    
-    /* Smooth scrolling */
-    html {
-      scroll-behavior: smooth;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthyHotMeal - Complete Health Tracking</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        .gradient-bg { background: linear-gradient(135deg, #0ea5a4 0%, #10b981 100%); }
+        .premium-feature { position: relative; }
+        .premium-feature::after { 
+            content: "PREMIUM"; 
+            position: absolute; 
+            top: 8px; 
+            right: 8px; 
+            background: #f59e0b; 
+            color: white; 
+            padding: 2px 8px; 
+            border-radius: 12px; 
+            font-size: 10px; 
+            font-weight: bold;
+        }
+        .streak-flame { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
 </head>
-<body class="bg-white text-gray-800 antialiased">
-  <!-- Header -->
-  <header class="border-b sticky top-0 bg-white z-10">
-    <div class="mx-auto max-w-5xl px-6 py-4 flex justify-between items-center">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 bg-gradient-to-br from-teal-400 to-cyan-500 rounded-lg flex items-center justify-center text-white font-bold">HH</div>
-        <div>
-          <a class="font-semibold text-lg">HealthyHotMeal</a>
-          <div class="text-xs text-gray-500">Meals • Heart-rate • Lifestyle</div>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 gradient-bg rounded-lg flex items-center justify-center text-white font-bold">HH</div>
+                    <span class="text-xl font-bold text-gray-800">HealthyHotMeal</span>
+                </div>
+                
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="#dashboard" class="text-gray-600 hover:text-teal-500 transition">Dashboard</a>
+                    <a href="#tracking" class="text-gray-600 hover:text-teal-500 transition">Tracking</a>
+                    <a href="#analytics" class="text-gray-600 hover:text-teal-500 transition">Analytics</a>
+                    <a href="#premium" class="text-gray-600 hover:text-teal-500 transition">Premium</a>
+                </div>
+
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2">
+                        <div class="streak-flame text-orange-500">🔥</div>
+                        <span id="streak-count" class="font-bold">0</span>
+                    </div>
+                    <button id="user-menu" class="w-8 h-8 gradient-bg rounded-full text-white flex items-center justify-center">
+                        U
+                    </button>
+                </div>
+            </div>
         </div>
-      </div>
-      <nav class="flex items-center gap-4 text-sm">
-        <a href="#how" class="hover:text-teal-500 transition-colors">How</a>
-        <a href="#features" class="hover:text-teal-500 transition-colors">Features</a>
-        <a href="#pricing" class="hover:text-teal-500 transition-colors">Pricing</a>
-        <a href="#signup" class="bg-teal-500 hover:bg-teal-600 text-white px-3 py-2 rounded transition-colors">Start free</a>
-      </nav>
+    </nav>
+
+    <!-- Main App -->
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Dashboard -->
+        <section id="dashboard" class="mb-12 fade-in">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <!-- Daily Stats -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="text-lg font-semibold mb-4">Today's Progress</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span>Calories</span>
+                                <span id="calories-today">0/2000</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div id="calories-progress" class="bg-red-500 h-2 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1">
+                                <span>Heart Rate</span>
+                                <span id="heart-rate">-- bpm</span>
+                            </div>
+                            <div class="text-sm text-gray-500">Last sync: <span id="last-sync">Never</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Streak & Badges -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="text-lg font-semibold mb-4">Achievements</h3>
+                    <div class="text-center">
+                        <div class="streak-flame text-4xl mb-2">🔥</div>
+                        <div id="current-streak" class="text-2xl font-bold mb-1">0 days</div>
+                        <div class="text-sm text-gray-500">Current streak</div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 mt-4">
+                        <div class="text-center p-2 bg-gray-100 rounded">
+                            <div>🥗</div>
+                            <div class="text-xs">Meals</div>
+                        </div>
+                        <div class="text-center p-2 bg-gray-100 rounded">
+                            <div>❤️</div>
+                            <div class="text-xs">HR Sync</div>
+                        </div>
+                        <div class="text-center p-2 bg-gray-100 rounded">
+                            <div>📊</div>
+                            <div class="text-xs">Check-in</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Daily Challenge -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <h3 class="text-lg font-semibold mb-4">Daily Challenge</h3>
+                    <div id="daily-challenge" class="mb-4">
+                        <p class="text-sm text-gray-600">Log 3 meals and sync heart rate to earn 50 points!</p>
+                    </div>
+                    <button onclick="completeDailyChallenge()" class="w-full gradient-bg text-white py-2 rounded-lg font-semibold">
+                        Complete Challenge
+                    </button>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <button onclick="showMealLogging()" class="bg-white p-4 rounded-xl shadow-lg text-center hover:shadow-xl transition">
+                    <div class="text-2xl mb-2">🍽️</div>
+                    <div class="font-semibold">Log Meal</div>
+                </button>
+                <button onclick="syncHeartRate()" class="bg-white p-4 rounded-xl shadow-lg text-center hover:shadow-xl transition">
+                    <div class="text-2xl mb-2">❤️</div>
+                    <div class="font-semibold">Sync HR</div>
+                </button>
+                <button onclick="showAnalytics()" class="bg-white p-4 rounded-xl shadow-lg text-center hover:shadow-xl transition">
+                    <div class="text-2xl mb-2">📊</div>
+                    <div class="font-semibold">Analytics</div>
+                </button>
+                <button onclick="showPremium()" class="premium-feature bg-gradient-to-r from-yellow-400 to-orange-400 text-white p-4 rounded-xl shadow-lg text-center hover:shadow-xl transition">
+                    <div class="text-2xl mb-2">⭐</div>
+                    <div class="font-semibold">Go Premium</div>
+                </button>
+            </div>
+        </section>
+
+        <!-- Meal Tracking -->
+        <section id="tracking" class="mb-12 fade-in" style="display: none;">
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-6">Meal Tracking</h2>
+                
+                <!-- Quick Log -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <button onclick="quickLogMeal('breakfast')" class="p-4 border-2 border-dashed border-gray-300 rounded-lg text-center hover:border-teal-400 transition">
+                        <div class="text-2xl">🌅</div>
+                        <div>Breakfast</div>
+                    </button>
+                    <button onclick="quickLogMeal('lunch')" class="p-4 border-2 border-dashed border-gray-300 rounded-lg text-center hover:border-teal-400 transition">
+                        <div class="text-2xl">🌞</div>
+                        <div>Lunch</div>
+                    </button>
+                    <button onclick="quickLogMeal('dinner')" class="p-4 border-2 border-dashed border-gray-300 rounded-lg text-center hover:border-teal-400 transition">
+                        <div class="text-2xl">🌙</div>
+                        <div>Dinner</div>
+                    </button>
+                </div>
+
+                <!-- Manual Log -->
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <h3 class="font-semibold mb-4">Manual Entry</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="text" id="meal-name" placeholder="Meal name" class="p-3 border rounded-lg">
+                        <input type="number" id="meal-calories" placeholder="Calories" class="p-3 border rounded-lg">
+                        <input type="number" id="meal-protein" placeholder="Protein (g)" class="p-3 border rounded-lg">
+                        <input type="number" id="meal-carbs" placeholder="Carbs (g)" class="p-3 border rounded-lg">
+                    </div>
+                    <button onclick="logManualMeal()" class="w-full gradient-bg text-white py-3 rounded-lg font-semibold mt-4">
+                        Log Meal
+                    </button>
+                </div>
+
+                <!-- Today's Meals -->
+                <div class="mt-6">
+                    <h3 class="font-semibold mb-4">Today's Meals</h3>
+                    <div id="meals-list" class="space-y-3">
+                        <!-- Meals will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Analytics -->
+        <section id="analytics" class="mb-12 fade-in" style="display: none;">
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-6">Health Analytics</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Calorie Chart -->
+                    <div>
+                        <h3 class="font-semibold mb-4">Weekly Calorie Intake</h3>
+                        <canvas id="calorieChart" width="400" height="200"></canvas>
+                    </div>
+                    
+                    <!-- Heart Rate Chart -->
+                    <div class="premium-feature">
+                        <h3 class="font-semibold mb-4">Heart Rate Trends</h3>
+                        <canvas id="heartRateChart" width="400" height="200"></canvas>
+                        <div class="premium-overlay"></div>
+                    </div>
+                </div>
+
+                <!-- Insights -->
+                <div class="mt-6 premium-feature">
+                    <h3 class="font-semibold mb-4">AI Health Insights</h3>
+                    <div id="ai-insights" class="bg-blue-50 p-4 rounded-lg">
+                        <p class="text-sm text-gray-600">Upgrade to Premium for personalized AI insights based on your meal patterns and heart rate data.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Premium -->
+        <section id="premium" class="mb-12 fade-in" style="display: none;">
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold mb-6">Go Premium</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <!-- Free Plan -->
+                    <div class="border-2 border-gray-200 rounded-xl p-6">
+                        <h3 class="text-xl font-bold mb-2">Free</h3>
+                        <div class="text-3xl font-bold mb-4">$0</div>
+                        <ul class="space-y-2 mb-6">
+                            <li class="flex items-center">✓ Basic meal tracking</li>
+                            <li class="flex items-center">✓ Manual heart rate</li>
+                            <li class="flex items-center">✓ Daily check-ins</li>
+                            <li class="flex items-center">✓ With ads</li>
+                        </ul>
+                        <button class="w-full bg-gray-200 text-gray-800 py-2 rounded-lg font-semibold">
+                            Current Plan
+                        </button>
+                    </div>
+
+                    <!-- Premium Plan -->
+                    <div class="border-2 border-teal-500 rounded-xl p-6 relative">
+                        <div class="absolute top-0 right-0 bg-teal-500 text-white px-3 py-1 rounded-bl-lg rounded-tr-lg text-sm font-semibold">
+                            POPULAR
+                        </div>
+                        <h3 class="text-xl font-bold mb-2">Premium</h3>
+                        <div class="text-3xl font-bold mb-4">$4.99<span class="text-sm font-normal">/month</span></div>
+                        <ul class="space-y-2 mb-6">
+                            <li class="flex items-center">✓ Advanced analytics</li>
+                            <li class="flex items-center">✓ Auto heart rate sync</li>
+                            <li class="flex items-center">✓ AI health insights</li>
+                            <li class="flex items-center">✓ Ad-free experience</li>
+                            <li class="flex items-center">✓ Export data</li>
+                        </ul>
+                        <button onclick="startPremiumCheckout()" class="w-full gradient-bg text-white py-2 rounded-lg font-semibold">
+                            Upgrade Now
+                        </button>
+                    </div>
+
+                    <!-- Team Plan -->
+                    <div class="border-2 border-gray-200 rounded-xl p-6">
+                        <h3 class="text-xl font-bold mb-2">Team</h3>
+                        <div class="text-3xl font-bold mb-4">$14.99</div>
+                        <ul class="space-y-2 mb-6">
+                            <li class="flex items-center">✓ Everything in Premium</li>
+                            <li class="flex items-center">✓ Team dashboard</li>
+                            <li class="flex items-center">✓ Coach features</li>
+                            <li class="flex items-center">✓ Priority support</li>
+                        </ul>
+                        <button class="w-full bg-gray-200 text-gray-800 py-2 rounded-lg font-semibold">
+                            Contact Sales
+                        </button>
+                    </div>
+                </div>
+
+                <!-- AdSense Placeholder -->
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-6">
+                    <div class="text-gray-500">AdSense Advertisement</div>
+                    <div class="text-sm text-gray-400 mt-2">This ad helps keep HealthyHotMeal free for everyone</div>
+                </div>
+            </div>
+        </section>
     </div>
-  </header>
 
-  <!-- Main -->
-  <main class="mx-auto max-w-5xl px-6 py-12">
-    <!-- Hero -->
-    <section class="grid md:grid-cols-2 gap-10 items-center">
-      <div>
-        <h1 class="text-4xl font-extrabold mb-4">Log meals • Track heart-rate • Build better habits</h1>
-        <p class="text-gray-600 mb-6">Personalized daily plans, micro-habits, and simple analytics to help you improve in 30 days.</p>
-        <div class="flex gap-3">
-          <a href="#signup" class="bg-teal-500 hover:bg-teal-600 text-white px-5 py-3 rounded transition-colors">Start free</a>
-          <a href="#features" class="border border-gray-300 hover:border-gray-400 px-5 py-3 rounded transition-colors">Learn more</a>
-        </div>
-        <div class="mt-4 text-sm text-gray-500">Join 12,000+ users • Rated 4.7/5</div>
-      </div>
-      <div>
-        <div class="bg-gradient-to-br from-teal-100 to-cyan-100 rounded-lg shadow max-w-md w-full h-64 flex items-center justify-center">
-          <div class="text-center">
-            <div class="text-teal-500 font-bold text-lg">App Screenshot</div>
-            <div class="text-gray-500 text-sm mt-2">Replace with hero-screenshot.png</div>
-          </div>
-        </div>
-      </div>
-    </section>
+    <!-- AdSense Script (Replace with your actual AdSense code) -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script>
 
-    <!-- How it works -->
-    <section id="how" class="mt-12">
-      <h2 class="text-2xl font-bold mb-4">How it works</h2>
-      <div class="grid md:grid-cols-3 gap-6">
-        <div class="p-4 bg-gray-50 rounded">
-          <h3 class="font-semibold">1. Log</h3>
-          <p class="text-sm text-gray-600">Quick meal logging: manual, barcode demo, or camera quick-add.</p>
-        </div>
-        <div class="p-4 bg-gray-50 rounded">
-          <h3 class="font-semibold">2. Analyse</h3>
-          <p class="text-sm text-gray-600">Calories, macros, resting heart-rate & trends.</p>
-        </div>
-        <div class="p-4 bg-gray-50 rounded">
-          <h3 class="font-semibold">3. Improve</h3>
-          <p class="text-sm text-gray-600">AI suggestions, daily micro-habits, streaks & badges.</p>
-        </div>
-      </div>
-    </section>
+    <script>
+        // Application State
+        const state = {
+            user: {
+                streak: 0,
+                points: 0,
+                isPremium: false,
+                lastCheckin: null
+            },
+            meals: [],
+            heartRateData: [],
+            dailyChallenges: [
+                "Log 3 meals today",
+                "Sync heart rate data",
+                "Stay under calorie goal",
+                "Complete all check-ins"
+            ]
+        };
 
-    <!-- Features -->
-    <section id="features" class="mt-10 grid md:grid-cols-2 gap-6">
-      <div class="bg-white p-6 rounded shadow">
-        <h3 class="text-xl font-bold mb-3">Core features</h3>
-        <ul class="list-disc pl-5 text-sm text-gray-700 space-y-2">
-          <li>Meal logging — manual & barcode demo</li>
-          <li>Heart-rate ingestion — BLE demo + manual fallback</li>
-          <li>Daily check-in, streaks, badges</li>
-        </ul>
-      </div>
-      <div class="bg-white p-6 rounded shadow">
-        <h3 class="text-xl font-bold mb-3">Integrations & Privacy</h3>
-        <ul class="list-disc pl-5 text-sm text-gray-700 space-y-2">
-          <li>Google Fit & Apple Health adapters (server-side)</li>
-          <li>Plausible-like analytics + opt-out</li>
-          <li>Stripe for subscriptions (server expected)</li>
-        </ul>
-      </div>
-    </section>
+        // Initialize the application
+        function initApp() {
+            loadUserData();
+            updateDashboard();
+            initializeCharts();
+            checkDailyCheckin();
+        }
 
-    <!-- Pricing -->
-    <section id="pricing" class="mt-12">
-      <h2 class="text-2xl font-bold mb-6">Pricing</h2>
-      <div class="grid md:grid-cols-3 gap-6">
-        <div class="p-6 border rounded">
-          <h4 class="font-semibold">Free</h4>
-          <p class="text-sm text-gray-600">Basic tracking, manual HR, daily check-in, ads</p>
-        </div>
-        <div class="p-6 border-2 rounded border-teal-200 bg-teal-50">
-          <h4 class="font-semibold">Premium</h4>
-          <p class="text-sm text-gray-600">No ads, export, advanced analytics — $4.99/mo</p>
-        </div>
-        <div class="p-6 border rounded">
-          <h4 class="font-semibold">Teams</h4>
-          <p class="text-sm text-gray-600">Contact for clinic/coach plans</p>
-        </div>
-      </div>
-    </section>
+        // Load user data from localStorage
+        function loadUserData() {
+            const saved = localStorage.getItem('hhm_user_data');
+            if (saved) {
+                Object.assign(state.user, JSON.parse(saved));
+            }
+        }
 
-    <!-- Signup -->
-    <section id="signup" class="mt-12 bg-white p-6 rounded shadow">
-      <h3 class="font-bold">Get early access</h3>
-      <!-- For Netlify Forms: add data-netlify="true" and a name attribute -->
-      <form id="signup-form" class="mt-4 grid md:grid-cols-3 gap-3">
-        <input name="email" type="email" placeholder="Your email" required class="p-3 border rounded col-span-2" />
-        <button type="submit" class="bg-teal-500 hover:bg-teal-600 text-white px-4 py-3 rounded transition-colors">Get access</button>
-      </form>
-    </section>
+        // Save user data to localStorage
+        function saveUserData() {
+            localStorage.setItem('hhm_user_data', JSON.stringify(state.user));
+        }
 
-    <!-- Ad placeholder -->
-    <section class="mt-8 p-4 text-center">
-      <div class="mx-auto max-w-xl border border-dashed border-gray-200 py-8 rounded">
-        <div class="text-sm text-gray-500">Ad placeholder — replace with AdSense snippet for Free users.</div>
-      </div>
-    </section>
+        // Update dashboard display
+        function updateDashboard() {
+            document.getElementById('streak-count').textContent = state.user.streak;
+            document.getElementById('current-streak').textContent = state.user.streak + ' days';
+            
+            // Calculate today's calories
+            const today = new Date().toDateString();
+            const todayMeals = state.meals.filter(meal => new Date(meal.timestamp).toDateString() === today);
+            const totalCalories = todayMeals.reduce((sum, meal) => sum + meal.calories, 0);
+            
+            document.getElementById('calories-today').textContent = `${totalCalories}/2000`;
+            document.getElementById('calories-progress').style.width = `${Math.min((totalCalories / 2000) * 100, 100)}%`;
+        }
 
-  </main>
+        // Navigation functions
+        function showSection(sectionId) {
+            document.querySelectorAll('section').forEach(section => {
+                section.style.display = 'none';
+            });
+            document.getElementById(sectionId).style.display = 'block';
+        }
 
-  <!-- Footer -->
-  <footer class="border-t mt-12">
-    <div class="mx-auto max-w-5xl px-6 py-6 flex justify-between items-center text-sm text-gray-500">
-      <div>© <span id="year"></span> HealthyHotMeal</div>
-      <div><a href="#" class="hover:text-teal-500 transition-colors">Privacy</a> • <a href="#" class="hover:text-teal-500 transition-colors">Terms</a></div>
-    </div>
-  </footer>
+        function showMealLogging() { showSection('tracking'); }
+        function showAnalytics() { showSection('analytics'); }
+        function showPremium() { showSection('premium'); }
 
-  <script>
-    // main.js functionality
-    document.getElementById('year').innerText = new Date().getFullYear();
-    
-    // Form submission handler
-    document.getElementById('signup-form').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const email = this.querySelector('input[name="email"]').value;
-      alert(`Thank you! We'll contact you at ${email} when we launch.`);
-      this.reset();
-    });
-    
-    // Simple event logger for analytics placeholder
-    window.hhEvent = function(event, label){
-      console.log('hhEvent', event, label);
-      // TODO: send to Plausible or your analytics endpoint
-    };
-    
-    // daily check-in (very light)
-    (function(){
-      const key = 'hhm_last_checkin';
-      const last = localStorage.getItem(key);
-      const days = last ? Math.floor((Date.now() - Number(last)) / (1000*60*60*24)) : Infinity;
-      if(days >= 1){
-        // optionally show modal or prompt — for static demo we do nothing
-        console.log('Daily check-in available');
-      }
-    })();
-    
-    // Simple RTL toggle for Arabic/English
-    const switcher = document.createElement('button');
-    switcher.innerText = 'العربية';
-    switcher.className = 'fixed bottom-4 left-4 bg-white border px-3 py-2 rounded shadow z-20';
-    document.body.appendChild(switcher);
-    let lang = 'en';
-    switcher.addEventListener('click', () => {
-      lang = lang === 'en' ? 'ar' : 'en';
-      document.documentElement.lang = lang;
-      document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
-      switcher.innerText = lang === 'ar' ? 'English' : 'العربية';
-    });
-  </script>
+        // Meal logging functionality
+        function quickLogMeal(type) {
+            const meals = {
+                breakfast: { name: "Breakfast", calories: 400, protein: 15, carbs: 60 },
+                lunch: { name: "Lunch", calories: 600, protein: 25, carbs: 80 },
+                dinner: { name: "Dinner", calories: 500, protein: 30, carbs: 50 }
+            };
+            
+            logMeal(meals[type]);
+        }
+
+        function logManualMeal() {
+            const meal = {
+                name: document.getElementById('meal-name').value || "Custom Meal",
+                calories: parseInt(document.getElementById('meal-calories').value) || 0,
+                protein: parseInt(document.getElementById('meal-protein').value) || 0,
+                carbs: parseInt(document.getElementById('meal-carbs').value) || 0,
+                timestamp: new Date().toISOString()
+            };
+            
+            logMeal(meal);
+            
+            // Clear form
+            document.getElementById('meal-name').value = '';
+            document.getElementById('meal-calories').value = '';
+            document.getElementById('meal-protein').value = '';
+            document.getElementById('meal-carbs').value = '';
+        }
+
+        function logMeal(meal) {
+            state.meals.push(meal);
+            updateDashboard();
+            updateMealsList();
+            
+            // Show confirmation
+            showNotification(`Meal logged: ${meal.name} (${meal.calories} cal)`);
+            
+            // Check for streak
+            checkStreak();
+        }
+
+        function updateMealsList() {
+            const container = document.getElementById('meals-list');
+            const today = new Date().toDateString();
+            const todayMeals = state.meals.filter(meal => new Date(meal.timestamp).toDateString() === today);
+            
+            container.innerHTML = todayMeals.map(meal => `
+                <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <div>
+                        <div class="font-semibold">${meal.name}</div>
+                        <div class="text-sm text-gray-500">${meal.calories} cal • ${meal.protein}g protein</div>
+                    </div>
+                    <div class="text-sm text-gray-400">
+                        ${new Date(meal.timestamp).toLocaleTimeString()}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Heart rate sync simulation
+        function syncHeartRate() {
+            if (!state.user.isPremium) {
+                showNotification('Auto heart rate sync requires Premium. Using manual entry.', 'warning');
+            }
+            
+            // Simulate heart rate reading
+            const heartRate = Math.floor(Math.random() * 40) + 60; // 60-100 bpm
+            const reading = {
+                bpm: heartRate,
+                timestamp: new Date().toISOString()
+            };
+            
+            state.heartRateData.push(reading);
+            document.getElementById('heart-rate').textContent = `${heartRate} bpm`;
+            document.getElementById('last-sync').textContent = 'Just now';
+            
+            showNotification(`Heart rate synced: ${heartRate} bpm`);
+            checkStreak();
+        }
+
+        // Streak management
+        function checkStreak() {
+            const today = new Date().toDateString();
+            if (state.user.lastCheckin !== today) {
+                state.user.streak++;
+                state.user.lastCheckin = today;
+                state.user.points += 10;
+                saveUserData();
+                updateDashboard();
+                
+                if (state.user.streak % 7 === 0) {
+                    showNotification(`🔥 Amazing! ${state.user.streak} day streak!`, 'success');
+                }
+            }
+        }
+
+        function checkDailyCheckin() {
+            const today = new Date().toDateString();
+            if (state.user.lastCheckin !== today) {
+                showNotification('Complete your daily check-in to maintain your streak!', 'info');
+            }
+        }
+
+        // Daily challenges
+        function completeDailyChallenge() {
+            state.user.points += 50;
+            showNotification('Daily challenge completed! +50 points', 'success');
+            updateDashboard();
+        }
+
+        // Charts initialization
+        function initializeCharts() {
+            // Calorie Chart
+            const calorieCtx = document.getElementById('calorieChart').getContext('2d');
+            new Chart(calorieCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    datasets: [{
+                        label: 'Calories',
+                        data: [1800, 2200, 1900, 2100, 1950, 2300, 2000],
+                        borderColor: '#0ea5a4',
+                        backgroundColor: 'rgba(14, 165, 164, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+
+            // Heart Rate Chart (Premium)
+            const hrCtx = document.getElementById('heartRateChart').getContext('2d');
+            new Chart(hrCtx, {
+                type: 'line',
+                data: {
+                    labels: ['6AM', '9AM', '12PM', '3PM', '6PM', '9PM'],
+                    datasets: [{
+                        label: 'Heart Rate',
+                        data: [65, 72, 68, 75, 70, 63],
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        // Stripe Checkout
+        function startPremiumCheckout() {
+            // In a real app, you would use Stripe.js
+            showNotification('Redirecting to secure checkout...', 'info');
+            
+            // Simulate successful payment
+            setTimeout(() => {
+                state.user.isPremium = true;
+                saveUserData();
+                showNotification('Welcome to Premium! Enjoy ad-free experience and advanced features.', 'success');
+                showSection('dashboard');
+            }, 2000);
+        }
+
+        // Notification system
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg text-white z-50 fade-in ${
+                type === 'success' ? 'bg-green-500' : 
+                type === 'warning' ? 'bg-yellow-500' : 
+                type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+            }`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        // AdSense integration
+        function showAd() {
+            // This would be handled by AdSense auto-placement
+            console.log('AdSense ad displayed');
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', initApp);
+
+        // Navigation event listeners
+        document.querySelectorAll('nav a').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const target = e.target.getAttribute('href').substring(1);
+                showSection(target);
+            });
+        });
+    </script>
 </body>
 </html>
